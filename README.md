@@ -1,1 +1,1 @@
-# SudokuRecognizer
+# Sudoku Recognizer
