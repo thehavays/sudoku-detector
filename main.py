@@ -1,8 +1,9 @@
+# Eray Havaylar S018954 Department of Computer Science
+import glob
 import os
 
 import cv2
 import numpy as np
-import glob
 
 
 def image_path():
@@ -10,9 +11,26 @@ def image_path():
 
 
 debug = False  # set True for debugging
-resize_dimensions = (640, 480)
-blob_threshold = 50000  # an estimated value for the kind of blob we want to evaluate
+resize_dimensions = (640, 480)  # resizing for standardizing big images
 rho_threshold = 25  # used for eliminate lines that close each other, remain only 1
+
+
+def find_average(biggest):
+    if (abs((biggest[3])[0][0] - (biggest[0])[0][0])) > 100:
+        average_width = (abs(((biggest[3])[0][0] - (biggest[0])[0][0]))) / 10
+    if (abs((biggest[3])[0][0] - (biggest[1])[0][0])) > 100:
+        average_width = (abs(((biggest[3])[0][0] - (biggest[1])[0][0]))) / 10
+    if (abs((biggest[3])[0][0] - (biggest[2])[0][0])) > 100:
+        average_width = (abs(((biggest[3])[0][0] - (biggest[2])[0][0]))) / 10
+
+    if (abs((biggest[3])[0][1] - (biggest[0])[0][1])) > 100:
+        average_height = (abs(((biggest[3])[0][1] - (biggest[0])[0][1]))) / 10
+    if (abs((biggest[3])[0][1] - (biggest[1])[0][1])) > 100:
+        average_height = (abs(((biggest[3])[0][1] - (biggest[1])[0][1]))) / 10
+    if (abs((biggest[3])[0][1] - (biggest[2])[0][1])) > 100:
+        average_height = (abs(((biggest[3])[0][1] - (biggest[2])[0][1]))) / 10
+
+    return average_width, average_height
 
 
 def main():
@@ -47,14 +65,13 @@ def main():
         # find the contours
         (_, contours, hierarchy) = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # evaluate all blobs to find blob with biggest area
-        # biggest rectangle in the image could probably be sudoku square if any sudoku exists
+        # finding biggest rectangle if any sudoku exists, image could probably be sudoku square
         biggest = None
         max_area = 0
         for i in range(len(contours)):
             con = contours[i]
             area = cv2.contourArea(con)
-            if area > blob_threshold:
+            if area > 50000:  # an estimated value for the kind of blob we want to evaluate
                 peri = cv2.arcLength(con, True)
                 approx = cv2.approxPolyDP(con, 0.02 * peri, True)
                 if area > max_area and len(approx) == 4:
@@ -66,19 +83,7 @@ def main():
 
             # Find average width and height to draw rectangles in sudoku later on
 
-            if (abs((biggest[3])[0][0] - (biggest[0])[0][0])) > 100:
-                average_width = (abs(((biggest[3])[0][0] - (biggest[0])[0][0]))) / 10
-            if (abs((biggest[3])[0][0] - (biggest[1])[0][0])) > 100:
-                average_width = (abs(((biggest[3])[0][0] - (biggest[1])[0][0]))) / 10
-            if (abs((biggest[3])[0][0] - (biggest[2])[0][0])) > 100:
-                average_width = (abs(((biggest[3])[0][0] - (biggest[2])[0][0]))) / 10
-
-            if (abs((biggest[3])[0][1] - (biggest[0])[0][1])) > 100:
-                average_height = (abs(((biggest[3])[0][1] - (biggest[0])[0][1]))) / 10
-            if (abs((biggest[3])[0][1] - (biggest[1])[0][1])) > 100:
-                average_height = (abs(((biggest[3])[0][1] - (biggest[1])[0][1]))) / 10
-            if (abs((biggest[3])[0][1] - (biggest[2])[0][1])) > 100:
-                average_height = (abs(((biggest[3])[0][1] - (biggest[2])[0][1]))) / 10
+            (average_width, average_height) = find_average(biggest)
 
             # Mask image and eliminate outer space of the sudoku
             (x, y) = thresh.shape
@@ -107,17 +112,11 @@ def main():
 
             if lines is not None:
 
-                # Each line in sudoku will be stored here
                 new_lines = []
-
-                # Each point inside the sudoku will be stored here
                 points = []
-
-                # Used to eliminate closest lines
                 horizontal_rhos = []
                 vertical_rhos = []
 
-                # Used to find bottom and right line of the sudoku rectangle
                 sudoku_bottom_y = 0
                 sudoku_right_x = 0
 
@@ -134,7 +133,7 @@ def main():
                         y2 = int(y0 - 1000 * a)
                         available = 1
                         if b > 0.5:
-                            # It is horizontal
+                            # For horizontal
                             for r in horizontal_rhos:
                                 if r - rho_threshold < rho < r + rho_threshold:
                                     # Won't add if any line close to this line is already added before
@@ -151,7 +150,7 @@ def main():
                                     cv2.waitKey(0)
 
                         else:
-                            # It is vertical
+                            # For vertical
                             for r in vertical_rhos:
                                 if abs(r - rho_threshold) < abs(rho) < abs(r + rho_threshold):
                                     # Won't add if any line close to this line is already added before
@@ -186,32 +185,14 @@ def main():
                                     cv2.rectangle(image, (int(res[0] + 5), int(res[1] + 5)), (
                                         int(res[0] + int(average_width)), int(res[1] + int(average_height))),
                                                   (255, 0, 0), 2)  # Sudoku rectangles will be blue
-                                    if debug:
-                                        print("right x : ", sudoku_right_x)
-                                        print("bottom y : ", sudoku_bottom_y)
-                                        print("res : ", res)
-
-                                        print("right x - res0 = ", sudoku_right_x - res[0])
-                                        print("bottom y - res 1 = ", sudoku_bottom_y - res[1])
-
-                                        print("average height ", average_height)
-                                        print("average width ", average_width)
-
-                                        print("(right x - res0) / average_width = ",
-                                              (sudoku_right_x - res[0]) / average_width)
-                                        print("(bottom y - res1) / average_height = ",
-                                              (sudoku_bottom_y - res[1]) / average_height)
-
-                                        print("matrix x : ", 9 - int((sudoku_right_x - res[0]) / average_width))
-                                        print("matrix y : ", 9 - int((sudoku_bottom_y - res[1]) / average_height))
 
                 # If points length is 100, then I could say the biggest rectangle is most probably a sudoku
                 if len(points) != 100:
                     print("Couldn't find sudoku in the image")
                 else:
-                    print("It is a Sudoku!")
+                    print("It's Sudoku!!!")
         else:
-            print("Couldn't find sudoku in the image")
+            print("It's not Sudoku!!!")
 
         cv2.imshow(img, image)
         cv2.waitKey(0)
